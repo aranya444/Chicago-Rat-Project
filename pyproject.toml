@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chicago_rat_project"
+version = "0.1.0"
+description = "Preprocess Chicago rodent baiting data into a GeoDataFrame"
+requires-python = ">=3.9"
+dependencies = ["pandas", "geopandas", "matplotlib", "pyogrio"]
+
+[tool.setuptools]
+packages = ["chicago_rat_project"]
+
+[tool.setuptools.package-data]
+chicago_rat_project = ["data/*.geojson"]
