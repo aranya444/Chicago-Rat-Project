@@ -7,7 +7,7 @@ name = "chicago_rat_project"
 version = "0.1.0"
 description = "Preprocess Chicago rodent baiting data into a GeoDataFrame"
 requires-python = ">=3.9"
-dependencies = ["pandas", "geopandas", "matplotlib", "pyogrio"]
+dependencies = ["pandas", "geopandas", "matplotlib", "pyogrio", "numpy", "PyWeekends"]
 
 [tool.setuptools]
 packages = ["chicago_rat_project"]
