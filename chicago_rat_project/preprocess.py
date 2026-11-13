@@ -5,6 +5,8 @@ from __future__ import annotations
 import geopandas as gpd
 import pandas as pd
 
+from .features import add_time_features
+
 DEFAULT_DROP_COLUMNS = (
     "Street Address",
     "X Coordinate",
@@ -27,6 +29,8 @@ def preprocess_rodent_data(
     crs: str = "EPSG:4326",
     dropna_ignore=DEFAULT_DROPNA_IGNORE,
     output_path: str | None = None,
+    add_features: bool = True,
+    drop_negative: bool = True,
 ) -> gpd.GeoDataFrame:
     """Clean the rodent baiting data and attach point geometry.
 
@@ -50,6 +54,12 @@ def preprocess_rodent_data(
     output_path : if given, save the GeoDataFrame there (GeoPackage, ``.gpkg``;
         the format is inferred from the extension by geopandas/pyogrio).
 
+    add_features : add 'Time to completion' (weekdays) and 'Creation Month' columns
+        (see :func:`chicago_rat_project.features.add_time_features`).
+
+    drop_negative : when features are added, remove rows whose 'Time to completion'
+        is negative (completed before created).
+
     Returns
     -------
     geopandas.GeoDataFrame
@@ -61,6 +71,11 @@ def preprocess_rodent_data(
         df = df[df["Status"] != exclude_status]
     subset = [c for c in df.columns if c not in set(dropna_ignore)]
     df = df.dropna(subset=subset)
+
+    if add_features:
+        df = add_time_features(df)
+        if drop_negative:
+            df = df[~(df["Time to completion"] < 0)]
 
     gdf = gpd.GeoDataFrame(
         df,
