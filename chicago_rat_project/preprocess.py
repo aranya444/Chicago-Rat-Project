@@ -13,7 +13,6 @@ DEFAULT_DROP_COLUMNS = (
     "Y Coordinate",
     "Location",
     "Ward",
-    "Community Area",
     "Current Activity",
     "Type of Service Request",
 )
@@ -21,24 +20,31 @@ DEFAULT_DROP_COLUMNS = (
 # Columns whose missing values are tolerated by dropna (none by default).
 DEFAULT_DROPNA_IGNORE = ()
 
+PREMISES_COLUMNS = (
+    "Number of Premises Baited",
+    "Number of Premises with Garbage",
+    "Number of Premises with Rats",
+)
+
 
 def preprocess_rodent_data(
     data: str | pd.DataFrame,
     drop_columns=DEFAULT_DROP_COLUMNS,
-    exclude_status: str | None = "Completed",
+    exclude_status: str | None = None,
     crs: str = "EPSG:4326",
     dropna_ignore=DEFAULT_DROPNA_IGNORE,
     output_path: str | None = None,
     add_features: bool = True,
     drop_negative: bool = True,
+    start_date: str | None = "2011-01-01",
 ) -> gpd.GeoDataFrame:
     """Clean the rodent baiting data and attach point geometry.
 
     Steps:
       1. Load the CSV (or copy the DataFrame passed in).
       2. Drop unneeded columns.
-      3. Remove rows whose ``Status`` equals ``exclude_status``
-         (pass ``None`` to keep all rows).
+      3. Remove records created before ``start_date``; remove rows whose ``Status`` equals ``exclude_status``
+         (default ``None`` keeps all rows).
       4. Drop rows with missing values in any column except ``dropna_ignore``
          (by default none).
       5. Build a GeoDataFrame with Point geometry from Longitude/Latitude.
@@ -47,7 +53,7 @@ def preprocess_rodent_data(
     ----------
     data : path to the CSV, or an already-loaded DataFrame.
     drop_columns : columns to remove (missing columns are ignored).
-    exclude_status : Status value to filter out.
+    exclude_status : Status value to filter out (default None keeps all statuses, including 'Completed').
     crs : coordinate reference system of Latitude/Longitude.
     dropna_ignore : columns whose missing values do not cause a row to be dropped.
 
@@ -60,6 +66,9 @@ def preprocess_rodent_data(
     drop_negative : when features are added, remove rows whose 'Time to completion'
         is negative (completed before created).
 
+    start_date : remove records whose 'Creation Date' is before this date
+        (default: the first day of 2011; pass ``None`` to keep everything).
+
     Returns
     -------
     geopandas.GeoDataFrame
@@ -67,10 +76,20 @@ def preprocess_rodent_data(
     df = pd.read_csv(data, low_memory=False) if isinstance(data, (str, bytes)) or hasattr(data, "__fspath__") else data.copy()
 
     df = df.drop(columns=list(drop_columns), errors="ignore")
+    if start_date is not None:
+        created = pd.to_datetime(df["Creation Date"], format="%m/%d/%Y", errors="coerce")
+        df = df[~(created < pd.Timestamp(start_date))].copy()
+    # A few premises counts hold junk like '2,222,220.'; make them numeric (junk -> NaN -> dropped).
+    for col in PREMISES_COLUMNS:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
     if exclude_status is not None:
         df = df[df["Status"] != exclude_status]
     subset = [c for c in df.columns if c not in set(dropna_ignore)]
     df = df.dropna(subset=subset)
+
+    if "Community Area" in df.columns:
+        df["Community Area"] = df["Community Area"].astype(int)
 
     if add_features:
         df = add_time_features(df)
